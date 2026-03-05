@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Necting - Sistema de Matching de Talento</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Pantalla de Bienvenida -->
+    <div id="welcome-screen" class="screen">
+        <div class="welcome-container">
+            <div class="welcome-icon">
+                <img src="images/logo-light.png" alt="Necting" class="logo-img logo-light">
+                <img src="images/logo-dark.png" alt="Necting" class="logo-img logo-dark" style="display: none;">
+            </div>
+            <h1>Necting</h1>
+            <p class="welcome-subtitle">Encuentra los empleados perfectos para tu equipo</p>
+            <p class="welcome-description">Evalúa candidatos basándote en sus soft skills y experiencia</p>
+            <div class="welcome-features">
+                <div class="feature-item">
+                    <div class="feature-icon green">
+                        <span>✓</span>
+                    </div>
+                    <div>
+                        <h3>
+                            <span class="swipe-text-desktop">Desliza hacia arriba</span>
+                            <span class="swipe-text-mobile">Desliza a la derecha</span>
+                        </h3>
+                        <p>
+                            <span class="swipe-text-desktop">Para marcar como apto</span>
+                            <span class="swipe-text-mobile">Para marcar como apto</span>
+                        </p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon red">
+                        <span>✕</span>
+                    </div>
+                    <div>
+                        <h3>
+                            <span class="swipe-text-desktop">Desliza hacia abajo</span>
+                            <span class="swipe-text-mobile">Desliza a la izquierda</span>
+                        </h3>
+                        <p>
+                            <span class="swipe-text-desktop">Para descartar candidato</span>
+                            <span class="swipe-text-mobile">Para descartar candidato</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <button class="btn-primary" onclick="hideWelcome()">Comenzar</button>
+        </div>
+    </div>
+
+    <!-- Contenedor Principal de la App -->
+    <div id="app-container" class="screen">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <div class="logo-icon">
+                        <img src="images/logo-light.png" alt="Necting" class="logo-img logo-light">
+                        <img src="images/logo-dark.png" alt="Necting" class="logo-img logo-dark" style="display: none;">
+                    </div>
+                    <div>
+                        <h1>Necting</h1>
+                        <p>Sistema de matching de talento</p>
+                    </div>
+                </div>
+                <div class="candidates-counter">
+                    <div class="counter-dot"></div>
+                    <span id="available-count">0 candidatos disponibles</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Contenido Principal -->
+        <main class="app-main">
+            <!-- Vista de Swipe -->
+            <div id="swipe-view" class="view active">
+                <div id="swipe-container"></div>
+                <div class="swipe-actions">
+                    <button class="action-btn undo-btn" onclick="undoSwipe()" disabled>
+                        <i class="fas fa-undo"></i>
+                    </button>
+                    <button class="action-btn reject-btn" onclick="rejectCurrent()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    <button class="action-btn accept-btn" onclick="acceptCurrent()">
+                        <i class="fas fa-heart"></i>
+                    </button>
+                </div>
+                <div class="swipe-counter">
+                    <span id="swipe-counter-text">0 / 0</span>
+                </div>
+            </div>
+
+            <!-- Vista de Matches -->
+            <div id="matches-view" class="view">
+                <div class="matches-header">
+                    <h2>Empleados Aptos</h2>
+                    <p id="matches-count">0 matches encontrados</p>
+                </div>
+                <div id="matches-grid" class="matches-grid"></div>
+            </div>
+
+            <!-- Modal: Contactar a match -->
+            <div id="contact-modal" class="contact-modal" aria-hidden="true">
+                <div class="contact-modal-backdrop" id="contact-modal-backdrop"></div>
+                <div class="contact-modal-content">
+                    <button type="button" class="contact-modal-close" id="contact-modal-close" aria-label="Cerrar">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    <div class="contact-modal-header">
+                        <img id="contact-avatar" class="contact-avatar" src="" alt="Foto de perfil">
+                        <div class="contact-header-text">
+                            <h3 id="contact-name">Nombre del candidato</h3>
+                            <p id="contact-position">Puesto</p>
+                        </div>
+                    </div>
+                    <div class="contact-modal-info">
+                        <div class="contact-info-icon">
+                            <i class="fas fa-envelope"></i>
+                        </div>
+                        <div class="contact-info-text">
+                            <p class="contact-info-title">Correo electrónico institucional</p>
+                            <p class="contact-info-subtitle" id="contact-email-info">
+                                El mensaje será enviado a la dirección institucional del empleado.
+                            </p>
+                        </div>
+                    </div>
+                    <form class="contact-form" onsubmit="event.preventDefault();">
+                        <div class="form-group">
+                            <label for="contact-subject">Asunto</label>
+                            <input type="text" id="contact-subject" placeholder="Asunto del mensaje">
+                        </div>
+                        <div class="form-group">
+                            <label for="contact-message">Mensaje</label>
+                            <textarea id="contact-message" rows="4" placeholder="Escribe tu mensaje aquí..."></textarea>
+                        </div>
+                        <p id="contact-error" class="error-message" style="display:block;"></p>
+                        <div class="contact-modal-actions">
+                            <button type="button" class="btn-cancel" id="contact-modal-cancel">Cancelar</button>
+                            <button type="button" class="btn-primary" id="contact-modal-send">
+                                <i class="fas fa-paper-plane"></i>
+                                <span>Enviar</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Vista de Perfil -->
+            <div id="profile-view" class="view">
+                <div class="profile-header-image">
+                    <button class="theme-toggle" onclick="toggleTheme()">
+                        <i class="fas fa-moon" id="theme-icon"></i>
+                    </button>
+                    <button class="logout-btn" onclick="logout()">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Cerrar sesión</span>
+                    </button>
+                    <div class="profile-image-container" id="profile-image-click-area">
+                        <img id="profile-image" src="" alt="Perfil">
+                        <button type="button" class="edit-image-btn" id="edit-image-btn" style="display: none;" title="Editar foto de perfil">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="profile-content">
+                    <div class="profile-card">
+                        <div id="user-email-badge" class="email-badge" style="display: none;"></div>
+                        <div class="profile-actions">
+                            <button class="btn-secondary" id="edit-profile-btn" onclick="toggleEditProfile()">
+                                <i class="fas fa-edit"></i>
+                                Editar Perfil
+                            </button>
+                            <div class="edit-actions" id="edit-actions" style="display: none;">
+                                <button class="btn-cancel" onclick="cancelEdit()">
+                                    <i class="fas fa-times"></i>
+                                    Cancelar
+                                </button>
+                                <button class="btn-primary" onclick="saveProfile()">
+                                    <i class="fas fa-save"></i>
+                                    Guardar
+                                </button>
+                            </div>
+                        </div>
+                        <div class="profile-field">
+                            <label>Nombre</label>
+                            <p id="profile-name"></p>
+                            <input type="text" id="edit-name" class="edit-input" style="display: none;">
+                        </div>
+                        <div class="profile-field">
+                            <label><i class="fas fa-briefcase"></i> Posición</label>
+                            <p id="profile-position"></p>
+                            <input type="text" id="edit-position" class="edit-input" style="display: none;">
+                        </div>
+                        <div class="profile-field">
+                            <label>Experiencia</label>
+                            <p id="profile-experience"></p>
+                            <input type="number" id="edit-experience" class="edit-input" min="0" max="50" placeholder="Años" style="display: none;">
+                        </div>
+                        <div class="profile-field">
+                            <label>Biografía</label>
+                            <p id="profile-bio"></p>
+                            <textarea id="edit-bio" class="edit-input" rows="3" style="display: none;"></textarea>
+                        </div>
+                        <div class="profile-field">
+                            <label><i class="fas fa-award"></i> Soft Skills</label>
+                            <div id="profile-skills" class="skills-container"></div>
+                            <div id="add-skill-container" class="add-skill-container" style="display: none;">
+                                <button type="button" class="btn-primary" onclick="openSoftSkillsPicker()">Agregar</button>
+                            </div>
+                            <div id="profile-skills-picker" class="profile-skills-picker" style="display: none;">
+                                <p class="picker-label">Selecciona soft skills para agregar (máximo 8 en total)</p>
+                                <div id="profile-skills-picker-list" class="skill-tags"></div>
+                                <button type="button" class="btn-primary" onclick="confirmAddSkills()">Listo</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <p class="stat-number" id="profiles-reviewed">0</p>
+                            <p class="stat-label">Perfiles Revisados</p>
+                        </div>
+                        <div class="stat-card">
+                            <p class="stat-number" id="matches-made">0</p>
+                            <p class="stat-label">Matches Realizados</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal: Editar foto de perfil -->
+            <div id="avatar-edit-modal" class="avatar-modal" aria-hidden="true">
+                <div class="avatar-modal-backdrop" id="avatar-modal-backdrop"></div>
+                <div class="avatar-modal-content">
+                    <h3 class="avatar-modal-title">Editar foto de perfil</h3>
+                    <div id="profile-photo-editor" class="profile-photo-editor">
+                        <p class="profile-photo-editor-label">Elige tu foto principal</p>
+                        <p class="profile-photo-editor-hint">Haz clic en una foto para usarla como principal. Puedes subir hasta 2 más (máx. 4).</p>
+                        <div class="profile-photos-thumbnails" id="profile-photos-thumbnails"></div>
+                        <div class="profile-upload-more" id="profile-upload-more"></div>
+                        <div class="profile-encuadre">
+                            <label>Encuadre en el ícono</label>
+                            <div class="profile-encuadre-preview" id="profile-encuadre-preview-wrap">
+                                <img id="profile-encuadre-preview" src="" alt="Vista previa">
+                            </div>
+                            <div class="profile-encuadre-controls">
+                                <label class="encuadre-slider-label">Posición horizontal <span id="encuadre-x-value">50</span>%</label>
+                                <input type="range" id="encuadre-x" min="0" max="100" value="50" class="encuadre-slider">
+                                <label class="encuadre-slider-label">Posición vertical <span id="encuadre-y-value">50</span>%</label>
+                                <input type="range" id="encuadre-y" min="0" max="100" value="50" class="encuadre-slider">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="avatar-modal-actions">
+                        <button type="button" class="btn-secondary" id="avatar-modal-cancel">Cancelar</button>
+                        <button type="button" class="btn-primary" id="avatar-modal-save">
+                            <i class="fas fa-save"></i> Guardar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Navegación -->
+        <nav class="app-nav">
+            <button class="nav-item active" onclick="switchView('swipe')">
+                <i class="fas fa-home"></i>
+                <span>Inicio</span>
+            </button>
+            <button class="nav-item" onclick="switchView('matches')">
+                <i class="fas fa-heart"></i>
+                <span>Matches</span>
+                <span class="nav-badge" id="matches-badge" style="display: none;">0</span>
+            </button>
+            <button class="nav-item" onclick="switchView('profile')">
+                <i class="fas fa-user"></i>
+                <span>Perfil</span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- Contenedor de Autenticación -->
+    <div id="auth-container" class="screen active">
+        <!-- Logo en el fondo morado (superior izquierda) -->
+        <div class="auth-logo">
+            <div class="auth-logo-icon">
+                <img src="images/logo-light.png" alt="Necting" class="logo-img logo-light">
+                <img src="images/logo-dark.png" alt="Necting" class="logo-img logo-dark" style="display: none;">
+            </div>
+            <div>
+                <h1>Necting</h1>
+                <p>Conecta con talento</p>
+            </div>
+        </div>
+        <!-- Botón de tema en el fondo morado (superior derecha) -->
+        <button class="theme-toggle-auth" onclick="toggleTheme()">
+            <i class="fas fa-moon" id="theme-icon-auth"></i>
+        </button>
+        <!-- Contenedor del formulario centrado -->
+        <div class="auth-wrapper">
+            <div class="auth-card">
+                <!-- Login View -->
+                <div id="login-view" class="auth-view active">
+                    <div class="auth-header">
+                        <h2>Bienvenido de nuevo</h2>
+                        <p>Inicia sesión con tu cuenta institucional</p>
+                    </div>
+                    <form id="login-form" onsubmit="handleLogin(event)">
+                        <div class="form-group">
+                            <label>Correo Institucional</label>
+                            <div class="input-wrapper">
+                                <i class="fas fa-envelope"></i>
+                                <input type="email" id="login-email" placeholder="tu.nombre@tecmilenio.mx" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Contraseña</label>
+                            <div class="input-wrapper">
+                                <i class="fas fa-lock"></i>
+                                <input type="password" id="login-password" placeholder="••••••••" required>
+                                <button type="button" class="toggle-password" onclick="togglePassword('login-password')">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div id="login-error" class="error-message" style="display: none;"></div>
+                        <div class="form-footer">
+                            <button type="button" class="link-btn" onclick="showForgotPassword()">¿Olvidaste tu contraseña?</button>
+                        </div>
+                        <button type="submit" class="btn-primary full-width" id="login-submit">
+                            <span class="btn-text">Iniciar Sesión</span>
+                            <i class="fas fa-spinner fa-spin btn-loader" style="display: none;"></i>
+                        </button>
+
+                        <div style="display: flex; align-items: center; gap: 0.75rem; margin: 1rem 0;">
+                            <div style="flex:1; height:1px; background: rgba(255,255,255,0.06);"></div>
+                            <small style="color:var(--gray-400);">o</small>
+                            <div style="flex:1; height:1px; background: rgba(255,255,255,0.06);"></div>
+                        </div>
+
+                        <button type="button" class="btn-outline full-width" id="ms-login-btn" onclick="handleMicrosoftLogin()">
+                            <i class="fab fa-microsoft" style="font-size: 1.25rem;"></i>
+                            <span>Iniciar sesión con Outlook</span>
+                        </button>
+                        <p id="ms-oauth-note" class="small" style="margin-top:0.75rem; color:rgba(255,255,255,0.6);">Si el botón aparece deshabilitado, Microsoft OAuth no está configurado en el servidor.</p>
+
+                        <p class="auth-switch">
+                            ¿No tienes cuenta? <button type="button" class="link-btn" onclick="showRegisterType()">Regístrate aquí</button>
+                        </p> 
+                    </form>
+                </div>
+
+                <!-- Register Type Selection View (Empleado / Empleador) -->
+                <div id="register-type-view" class="auth-view">
+                    <div class="auth-header">
+                        <h2>Crear cuenta</h2>
+                        <p>Selecciona tu tipo de cuenta</p>
+                    </div>
+                    <p class="register-type-question">¿Cómo deseas usar Necting?</p>
+                    <div class="account-type-cards">
+                        <button type="button" class="account-type-card" data-type="empleado" onclick="showRegisterForm('empleado')">
+                            <div class="account-type-icon">
+                                <i class="fas fa-user-friends"></i>
+                            </div>
+                            <h3>Empleado</h3>
+                            <p class="account-type-desc">Busco conectar con empleadores y mostrar mis soft skills</p>
+                            <span class="account-type-note account-type-note-required">Requiere correo @tecmilenio.mx</span>
+                        </button>
+                        <button type="button" class="account-type-card" data-type="empleador" onclick="showRegisterForm('empleador')">
+                            <div class="account-type-icon">
+                                <i class="fas fa-briefcase"></i>
+                            </div>
+                            <h3>Empleador</h3>
+                            <p class="account-type-desc">Busco empleados con soft skills específicos para mi empresa</p>
+                            <span class="account-type-note">Acepta cualquier dominio de correo</span>
+                        </button>
+                    </div>
+                    <p class="auth-switch auth-switch-register-type">
+                        ¿Ya tienes cuenta? <button type="button" class="link-btn" onclick="showLogin()">Inicia sesión</button>
+                    </p>
+                </div>
+
+                <!-- OAuth: elegir tipo de cuenta tras iniciar con Microsoft -->
+                <div id="oauth-choose-type-view" class="auth-view">
+                    <div class="auth-header">
+                        <h2>Selecciona tu tipo de cuenta</h2>
+                        <p>Iniciaste sesión con Microsoft</p>
+                        <p id="oauth-pending-email" class="oauth-pending-email"></p>
+                    </div>
+                    <p class="register-type-question">¿Cómo deseas usar Necting?</p>
+                    <div id="oauth-choose-type-error" class="error-message" style="display: none;"></div>
+                    <div class="account-type-cards">
+                        <button type="button" class="account-type-card" data-type="empleado" onclick="handleOAuthComplete('empleado')">
+                            <div class="account-type-icon">
+                                <i class="fas fa-user-friends"></i>
+                            </div>
+                            <h3>Empleado</h3>
+                            <p class="account-type-desc">Busco conectar con empleadores y mostrar mis soft skills</p>
+                            <span class="account-type-note account-type-note-required">Solo correo @tecmilenio.mx</span>
+                        </button>
+                        <button type="button" class="account-type-card" data-type="empleador" onclick="handleOAuthComplete('empleador')">
+                            <div class="account-type-icon">
+                                <i class="fas fa-briefcase"></i>
+                            </div>
+                            <h3>Empleador</h3>
+                            <p class="account-type-desc">Busco empleados con soft skills específicos para mi empresa</p>
+                            <span class="account-type-note">Cualquier correo (outlook.com, etc.)</span>
+                        </button>
+                    </div>
+                    <p class="auth-switch auth-switch-register-type">
+                        <button type="button" class="link-btn" onclick="cancelOAuthPendingAndShowLogin()">Usar otra cuenta</button>
+                    </p>
+                </div>
+
+                <!-- Register Form View (compartido Empleado / Empleador) -->
+                <div id="register-view" class="auth-view">
+                    <div class="auth-header">
+                        <h2>Crear cuenta</h2>
+                        <p>Completa tu información</p>
+                    </div>
+                    <button type="button" class="back-link-btn" onclick="showRegisterType()">
+                        <i class="fas fa-arrow-left"></i> Cambiar tipo de cuenta
+                    </button>
+                    <div id="register-account-type-box" class="register-account-type-box">
+                        <!-- Se rellena por JS según tipo seleccionado -->
+                    </div>
+                    <form id="register-form" onsubmit="handleRegister(event)">
+                        <div class="form-group">
+                            <label>Nombre Completo</label>
+                            <div class="input-wrapper">
+                                <i class="fas fa-user"></i>
+                                <input type="text" id="register-name" placeholder="Tu nombre completo" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label id="register-email-label">Correo Institucional</label>
+                            <div class="input-wrapper">
+                                <i class="fas fa-envelope"></i>
+                                <input type="email" id="register-email" placeholder="tu.nombre@tecmilenio.mx" required>
+                            </div>
+                            <p class="input-hint" id="register-email-hint">Usa tu correo institucional @tecmilenio.mx</p>
+                        </div>
+                        <div class="form-group">
+                            <label>Contraseña</label>
+                            <div class="input-wrapper">
+                                <i class="fas fa-lock"></i>
+                                <input type="password" id="register-password" placeholder="Mínimo 8 caracteres" required>
+                                <button type="button" class="toggle-password" onclick="togglePassword('register-password')">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                            <div id="password-requirements" class="password-requirements" style="display: none; margin-top: 0.5rem;">
+                                <p class="small">La contraseña debe incluir:</p>
+                                <ul style="margin: 0.25rem 0 0 1.25rem; padding: 0; list-style: none;">
+                                    <li id="req-length" class="req-item invalid">8–16 caracteres</li>
+                                    <li id="req-lower" class="req-item invalid">Una minúscula</li>
+                                    <li id="req-upper" class="req-item invalid">Una mayúscula</li>
+                                    <li id="req-number" class="req-item invalid">Un número</li>
+                                    <li id="req-symbol" class="req-item invalid">Un símbolo</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Confirmar Contraseña</label>
+                            <div class="input-wrapper">
+                                <i class="fas fa-lock"></i>
+                                <input type="password" id="register-confirm" placeholder="Repite tu contraseña" required>
+                            </div>
+                        </div>
+                        <div id="register-error" class="error-message" style="display: none;"></div>
+                        <button type="submit" class="btn-primary full-width" id="register-submit">
+                            <span class="btn-text">Crear Cuenta</span>
+                            <i class="fas fa-spinner fa-spin btn-loader" style="display: none;"></i>
+                        </button>
+                        <p class="auth-switch">
+                            ¿Ya tienes cuenta? <button type="button" class="link-btn" onclick="showLogin()">Inicia sesión</button>
+                        </p>
+                    </form>
+                </div>
+
+                <!-- Forgot Password View -->
+                <div id="forgot-password-view" class="auth-view">
+                    <button class="back-btn" onclick="showLogin()">
+                        <i class="fas fa-arrow-left"></i>
+                        <span>Volver</span>
+                    </button>
+                    <div class="auth-header">
+                        <h2>¿Olvidaste tu contraseña?</h2>
+                        <p>Ingresa tu correo institucional y te enviaremos instrucciones para restablecerla</p>
+                    </div>
+                    <form id="forgot-password-form" onsubmit="handleForgotPassword(event)">
+                        <div class="form-group">
+                            <label>Correo Institucional</label>
+                            <div class="input-wrapper">
+                                <i class="fas fa-envelope"></i>
+                                <input type="email" id="forgot-email" placeholder="tu.nombre@tecmilenio.mx" required>
+                            </div>
+                        </div>
+                        <div id="forgot-error" class="error-message" style="display: none;"></div>
+                        <button type="submit" class="btn-primary full-width" id="forgot-submit">
+                            <span class="btn-text">Enviar instrucciones</span>
+                            <i class="fas fa-spinner fa-spin btn-loader" style="display: none;"></i>
+                        </button>
+                        <div class="info-box">
+                            <p><strong>Nota:</strong> Solo puedes restablecer la contraseña con tu correo institucional (@tecmilenio.mx)</p>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Forgot Password: ingresar código OTP -->
+                <div id="forgot-otp-view" class="auth-view">
+                    <button class="back-btn" onclick="showForgotPasswordBackFromOtp()">
+                        <i class="fas fa-arrow-left"></i>
+                        <span>Volver</span>
+                    </button>
+                    <div class="auth-header">
+                        <div class="verify-icon">
+                            <i class="fas fa-key"></i>
+                        </div>
+                        <h2>Código de verificación</h2>
+                        <p>Hemos enviado un código de 6 dígitos a</p>
+                        <p class="verify-email" id="forgot-otp-email"></p>
+                        <p class="small text-muted">El código expira en 10 minutos.</p>
+                    </div>
+                    <form id="forgot-otp-form" onsubmit="handleForgotOtp(event)">
+                        <div class="form-group">
+                            <label class="text-center">Ingresa el código</label>
+                            <div class="code-inputs" id="forgot-otp-inputs">
+                                <input type="text" maxlength="1" class="code-input forgot-code-input" data-index="0">
+                                <input type="text" maxlength="1" class="code-input forgot-code-input" data-index="1">
+                                <input type="text" maxlength="1" class="code-input forgot-code-input" data-index="2">
+                                <input type="text" maxlength="1" class="code-input forgot-code-input" data-index="3">
+                                <input type="text" maxlength="1" class="code-input forgot-code-input" data-index="4">
+                                <input type="text" maxlength="1" class="code-input forgot-code-input" data-index="5">
+                            </div>
+                        </div>
+                        <div id="forgot-otp-error" class="error-message" style="display: none;"></div>
+                        <button type="submit" class="btn-primary full-width" id="forgot-otp-submit">
+                            <i class="fas fa-check-circle"></i>
+                            <span class="btn-text">Verificar código</span>
+                            <i class="fas fa-spinner fa-spin btn-loader" style="display: none;"></i>
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Forgot Password: nueva contraseña -->
+                <div id="forgot-new-password-view" class="auth-view">
+                    <div class="auth-header">
+                        <div class="verify-icon">
+                            <i class="fas fa-lock"></i>
+                        </div>
+                        <h2>Nueva contraseña</h2>
+                        <p>Ingresa y confirma tu nueva contraseña</p>
+                    </div>
+                    <form id="forgot-new-password-form" onsubmit="handleResetPasswordSubmit(event)">
+                        <div class="form-group">
+                            <label>Nueva contraseña</label>
+                            <div class="input-wrapper">
+                                <i class="fas fa-lock"></i>
+                                <input type="password" id="forgot-new-password" placeholder="Mín. 8 caracteres" required>
+                            </div>
+                            <div id="forgot-pwd-requirements" class="password-requirements" style="display: none; margin-top: 0.5rem;">
+                                <p class="small">La contraseña debe incluir:</p>
+                                <ul style="margin: 0.25rem 0 0 1.25rem; padding: 0; list-style: none;">
+                                    <li id="forgot-req-length" class="req-item invalid">8–16 caracteres</li>
+                                    <li id="forgot-req-lower" class="req-item invalid">Una minúscula</li>
+                                    <li id="forgot-req-upper" class="req-item invalid">Una mayúscula</li>
+                                    <li id="forgot-req-number" class="req-item invalid">Un número</li>
+                                    <li id="forgot-req-symbol" class="req-item invalid">Un símbolo</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Confirmar contraseña</label>
+                            <div class="input-wrapper">
+                                <i class="fas fa-lock"></i>
+                                <input type="password" id="forgot-confirm-password" placeholder="Repite la contraseña" required>
+                            </div>
+                        </div>
+                        <div id="forgot-new-password-error" class="error-message" style="display: none;"></div>
+                        <button type="submit" class="btn-primary full-width" id="forgot-new-password-submit">
+                            <i class="fas fa-check-circle"></i>
+                            <span class="btn-text">Cambiar contraseña</span>
+                            <i class="fas fa-spinner fa-spin btn-loader" style="display: none;"></i>
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Email Verification View -->
+                <div id="verify-email-view" class="auth-view">
+                    <div class="auth-header">
+                        <div class="verify-icon">
+                            <i class="fas fa-envelope"></i>
+                        </div>
+                        <h2>Verifica tu correo</h2>
+                        <p>Hemos enviado un código de 6 dígitos a</p>
+                        <p class="verify-email" id="verify-email-text"></p>
+                    </div>
+                    <form id="verify-form" onsubmit="handleVerifyEmail(event)">
+                        <div class="form-group">
+                            <label class="text-center">Ingresa el código de verificación</label>
+                            <div class="code-inputs" id="code-inputs">
+                                <input type="text" maxlength="1" class="code-input" data-index="0">
+                                <input type="text" maxlength="1" class="code-input" data-index="1">
+                                <input type="text" maxlength="1" class="code-input" data-index="2">
+                                <input type="text" maxlength="1" class="code-input" data-index="3">
+                                <input type="text" maxlength="1" class="code-input" data-index="4">
+                                <input type="text" maxlength="1" class="code-input" data-index="5">
+                            </div>
+                        </div>
+                        <div id="verify-error" class="error-message" style="display: none;"></div>
+                        <button type="submit" class="btn-primary full-width" id="verify-submit">
+                            <i class="fas fa-check-circle"></i>
+                            <span class="btn-text">Verificar Código</span>
+                            <i class="fas fa-spinner fa-spin btn-loader" style="display: none;"></i>
+                        </button>
+                        <div class="resend-section">
+                            <p>¿No recibiste el código?</p>
+                            <button type="button" class="link-btn" id="resend-btn" onclick="resendCode()">
+                                <i class="fas fa-redo"></i>
+                                Reenviar código
+                            </button>
+                            <p class="resend-timer" id="resend-timer" style="display: none;"></p>
+                        </div>
+                        <div class="info-box">
+                            <p><strong>Consejo:</strong> Revisa tu carpeta de spam si no ves el correo en tu bandeja de entrada.</p>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Completar perfil: ocupación + experiencia -->
+                <div id="profile-completion-view" class="auth-view">
+                    <div class="auth-header">
+                        <div class="verify-icon">
+                            <i class="fas fa-graduation-cap"></i>
+                        </div>
+                        <h2>¡Ya casi terminamos!</h2>
+                        <p>Cuéntanos un poco más sobre ti</p>
+                    </div>
+                    <form id="profile-completion-form" onsubmit="handleProfileCompletion(event)">
+                        <div class="form-group">
+                            <label>¿Cuál es tu ocupación?</label>
+                            <div class="input-wrapper">
+                                <i class="fas fa-user"></i>
+                                <input type="text" id="profile-occupation" placeholder="Ej: Ingeniería en Software" autocomplete="off">
+                            </div>
+                            <p class="input-hint">Puedes escribir la tuya o elegir una sugerencia</p>
+                            <p class="suggestions-label">Sugerencias populares</p>
+                            <div class="occupation-suggestions">
+                                <button type="button" class="suggestion-chip" data-value="Ingeniería en Software">Ingeniería en Software</button>
+                                <button type="button" class="suggestion-chip" data-value="Administración de Empresas">Administración de Empresas</button>
+                                <button type="button" class="suggestion-chip" data-value="Diseño Gráfico">Diseño Gráfico</button>
+                                <button type="button" class="suggestion-chip" data-value="Marketing Digital">Marketing Digital</button>
+                                <button type="button" class="suggestion-chip" data-value="Becario">Becario</button>
+                                <button type="button" class="suggestion-chip" data-value="Practicante">Practicante</button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>¿Cuántos años de experiencia tienes?</label>
+                            <div class="input-wrapper">
+                                <i class="fas fa-calendar-alt"></i>
+                                <input type="number" id="profile-experience-years" min="0" max="50" value="0" placeholder="0">
+                            </div>
+                            <p class="input-hint">Si no tienes experiencia, ingresa 0</p>
+                        </div>
+                        <div id="profile-completion-error" class="error-message" style="display: none;"></div>
+                        <button type="submit" class="btn-primary full-width" id="profile-completion-submit">
+                            <i class="fas fa-check-circle"></i>
+                            <span class="btn-text">Completar Perfil</span>
+                            <i class="fas fa-spinner fa-spin btn-loader" style="display: none;"></i>
+                        </button>
+                        <div class="info-box info-box-note">
+                            <p><strong>Nota:</strong> Esta información aparecerá en tu perfil y podrás cambiarla más tarde.</p>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Subir fotos de perfil (mín 2, máx 4) -->
+                <div id="profile-photos-view" class="auth-view">
+                    <div class="auth-header">
+                        <div class="verify-icon">
+                            <i class="fas fa-camera"></i>
+                        </div>
+                        <h2>Sube tus fotos de perfil</h2>
+                        <p>Añade al menos 2 fotos para completar tu cuenta</p>
+                        <div class="photos-progress">
+                            <span id="photos-progress-text">0 de 2 fotos mínimas</span>
+                        </div>
+                    </div>
+                    <div class="photos-upload-grid">
+                        <div class="photo-slot" data-slot="1" id="photo-slot-1">
+                            <div class="photo-slot-inner">
+                                <i class="fas fa-user-circle photo-placeholder-icon"></i>
+                                <span class="photo-slot-label">Requerida</span>
+                                <span class="photo-slot-hint">Click para subir</span>
+                                <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" class="photo-file-input" data-slot="1" aria-label="Subir foto 1">
+                            </div>
+                        </div>
+                        <div class="photo-slot" data-slot="2" id="photo-slot-2">
+                            <div class="photo-slot-inner">
+                                <i class="fas fa-user-circle photo-placeholder-icon"></i>
+                                <span class="photo-slot-label">Requerida</span>
+                                <span class="photo-slot-hint">Click para subir</span>
+                                <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" class="photo-file-input" data-slot="2" aria-label="Subir foto 2">
+                            </div>
+                        </div>
+                        <div class="photo-slot" data-slot="3" id="photo-slot-3">
+                            <div class="photo-slot-inner">
+                                <i class="fas fa-user-circle photo-placeholder-icon"></i>
+                                <span class="photo-slot-label">Opcional</span>
+                                <span class="photo-slot-hint">Click para subir</span>
+                                <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" class="photo-file-input" data-slot="3" aria-label="Subir foto 3">
+                            </div>
+                        </div>
+                        <div class="photo-slot" data-slot="4" id="photo-slot-4">
+                            <div class="photo-slot-inner">
+                                <i class="fas fa-user-circle photo-placeholder-icon"></i>
+                                <span class="photo-slot-label">Opcional</span>
+                                <span class="photo-slot-hint">Click para subir</span>
+                                <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" class="photo-file-input" data-slot="4" aria-label="Subir foto 4">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="info-box info-box-photos">
+                        <p><strong>Nota importante:</strong></p>
+                        <ul>
+                            <li>Solo se permiten archivos de imagen (JPG, PNG, etc.)</li>
+                            <li>Tamaño máximo por imagen: 5MB</li>
+                            <li>Debes subir al menos 2 fotos para continuar</li>
+                            <li>Puedes subir hasta 4 fotos en total</li>
+                        </ul>
+                    </div>
+                    <div id="profile-photos-error" class="error-message" style="display: none;"></div>
+                    <button type="button" class="btn-primary full-width" id="profile-photos-finish-btn" onclick="handleFinishProfilePhotos()" disabled>
+                        <i class="fas fa-check-circle"></i>
+                        <span class="btn-text">Finalizar Registro</span>
+                        <i class="fas fa-spinner fa-spin btn-loader" style="display: none;"></i>
+                    </button>
+                </div>
+
+                <!-- Soft Skills Selection View (obligatoria después de verificar email) -->
+                <div id="soft-skills-view" class="auth-view">
+                    <div class="auth-header">
+                        <div class="verify-icon">
+                            <i class="fas fa-award"></i>
+                        </div>
+                        <h2>Selecciona tus soft skills</h2>
+                        <p>Elige al menos 3 que te representen</p>
+                        <div class="skills-progress">
+                            <span id="skills-counter" class="counter-text">0/3 seleccionados</span>
+                        </div>
+                    </div>
+                    <form id="soft-skills-form" onsubmit="handleSoftSkillsSubmit(event)">
+                        <div class="form-group">
+                            <label class="text-center">Haz clic para seleccionar o deseleccionar</label>
+                            <div id="soft-skills-container" class="skills-container"></div>
+                        </div>
+                        <div id="soft-skills-error" class="error-message" style="display: none;"></div>
+                        <button type="submit" class="btn-primary full-width" id="soft-skills-submit">
+                            <i class="fas fa-check-circle"></i>
+                            <span class="btn-text">Listo</span>
+                            <i class="fas fa-spinner fa-spin btn-loader" style="display: none;"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="js/app.js?v=3"></script>
+</body>
+</html>
