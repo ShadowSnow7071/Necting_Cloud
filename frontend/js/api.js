@@ -2,7 +2,7 @@
  * API Client para Necting
  */
 // Usar URL relativa ya que el frontend y backend están en el mismo puerto
-const API_BASE_URL = 'https://apptinder-tecmi.onrender.com/api';
+const API_BASE_URL = 'https://necting-cloud.onrender.com/api';
 
 // Función auxiliar para hacer peticiones
 async function apiRequest(endpoint, options = {}) {
