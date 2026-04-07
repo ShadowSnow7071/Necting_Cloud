@@ -65,8 +65,43 @@ def generate_verification_code():
     return ''.join(secrets.choice(string.digits) for _ in range(6))
 
 
-def send_verification_email(to_email, code):
-    """Envía el código de verificación por email. Retorna (éxito, mensaje_error)."""
+def _send_email_via_resend(to_email, subject, body, reply_to=None):
+    """Envía email usando la API HTTP de Resend (sin SMTP)."""
+    resend_api_key = (os.environ.get("RESEND_API_KEY") or "").strip()
+    email_from = (os.environ.get("EMAIL_FROM") or "").strip()
+
+    if not resend_api_key or not email_from:
+        return False, "Falta RESEND_API_KEY o EMAIL_FROM en variables de entorno"
+
+    headers = {
+        "Authorization": f"Bearer {resend_api_key}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "from": email_from,
+        "to": [to_email],
+        "subject": subject,
+        "text": body,
+    }
+    if reply_to:
+        payload["reply_to"] = reply_to
+
+    try:
+        response = requests.post(
+            "https://api.resend.com/emails",
+            headers=headers,
+            json=payload,
+            timeout=20,
+        )
+        if 200 <= response.status_code < 300:
+            return True, None
+        return False, f"Resend API error {response.status_code}: {response.text}"
+    except Exception as e:
+        return False, f"Error llamando API de Resend: {e}"
+
+
+def _send_email_via_smtp(to_email, subject, body, reply_to=None):
+    """Envía email por SMTP (fallback para desarrollo local)."""
     import smtplib
     from email.message import EmailMessage
 
@@ -80,118 +115,100 @@ def send_verification_email(to_email, code):
     smtp_pass = os.environ.get("SMTP_PASS") or ""
 
     if not all([smtp_host, smtp_user, smtp_pass]):
-        print(f"[AVISO] SMTP no configurado. Codigo para {to_email}: {code}")
-        return False, "Configuración SMTP incompleta en .env"
+        return False, "Configuración SMTP incompleta en variables de entorno"
 
     try:
         msg = EmailMessage()
-        msg["Subject"] = "Código de verificación - Necting"
+        msg["Subject"] = subject
         msg["From"] = os.environ.get("SMTP_FROM", smtp_user)
         msg["To"] = to_email
-        msg.set_content(
-            f"Tu código de verificación es: {code}\n\n"
-            "Escríbelo en la aplicación para confirmar tu correo."
-        )
+        if reply_to:
+            msg["Reply-To"] = reply_to
+        msg.set_content(body)
+
         server = smtplib.SMTP(smtp_host, smtp_port)
         server.starttls()
         server.login(smtp_user, smtp_pass)
         server.send_message(msg)
         server.quit()
-        print(f"[OK] Email enviado a {to_email}")
         return True, None
     except Exception as e:
-        print(f"[ERROR] Error enviando email a {to_email}: {e}")
-        print(f"   Codigo (desarrollo): {code}")
         return False, str(e)
+
+
+def _send_email(to_email, subject, body, reply_to=None):
+    """
+    Dispatcher de email.
+    EMAIL_PROVIDER=resend|smtp (default: resend).
+    """
+    provider = (os.environ.get("EMAIL_PROVIDER") or "resend").strip().lower()
+    if provider == "smtp":
+        return _send_email_via_smtp(to_email, subject, body, reply_to=reply_to)
+    if provider == "resend":
+        return _send_email_via_resend(to_email, subject, body, reply_to=reply_to)
+    return False, f"EMAIL_PROVIDER no soportado: {provider}"
+
+
+def send_verification_email(to_email, code):
+    """Envía el código de verificación por email. Retorna (éxito, mensaje_error)."""
+    subject = "Código de verificación - Necting"
+    body = (
+        f"Tu código de verificación es: {code}\n\n"
+        "Escríbelo en la aplicación para confirmar tu correo."
+    )
+
+    ok, err = _send_email(to_email, subject, body)
+    if ok:
+        print(f"[OK] Email enviado a {to_email}")
+        return True, None
+
+    print(f"[ERROR] Error enviando email a {to_email}: {err}")
+    print(f"   Codigo (desarrollo): {code}")
+    return False, err
 
 
 def send_password_reset_email(to_email, code, expires_minutes=10):
     """Envía el código de recuperación de contraseña por email. Retorna (éxito, mensaje_error)."""
-    import smtplib
-    from email.message import EmailMessage
+    subject = "Código para restablecer tu contraseña - Necting"
+    body = (
+        f"Tu código para restablecer la contraseña es: {code}\n\n"
+        f"El código expira en {expires_minutes} minutos.\n\n"
+        "Ingrésalo en la aplicación para continuar con el restablecimiento."
+    )
 
-    smtp_host = os.environ.get("SMTP_HOST", "").strip()
-    smtp_port_str = (os.environ.get("SMTP_PORT") or "587").strip() or "587"
-    try:
-        smtp_port = int(smtp_port_str)
-    except ValueError:
-        smtp_port = 587
-    smtp_user = (os.environ.get("SMTP_USER") or "").strip()
-    smtp_pass = os.environ.get("SMTP_PASS") or ""
-
-    if not all([smtp_host, smtp_user, smtp_pass]):
-        print(f"[AVISO] SMTP no configurado. Codigo reset para {to_email}: {code}")
-        return False, "Configuración SMTP incompleta en .env"
-
-    try:
-        msg = EmailMessage()
-        msg["Subject"] = "Código para restablecer tu contraseña - Necting"
-        msg["From"] = os.environ.get("SMTP_FROM", smtp_user)
-        msg["To"] = to_email
-        msg.set_content(
-            f"Tu código para restablecer la contraseña es: {code}\n\n"
-            f"El código expira en {expires_minutes} minutos.\n\n"
-            "Ingrésalo en la aplicación para continuar con el restablecimiento."
-        )
-        server = smtplib.SMTP(smtp_host, smtp_port)
-        server.starttls()
-        server.login(smtp_user, smtp_pass)
-        server.send_message(msg)
-        server.quit()
+    ok, err = _send_email(to_email, subject, body)
+    if ok:
         print(f"[OK] Email de reset enviado a {to_email}")
         return True, None
-    except Exception as e:
-        print(f"[ERROR] Error enviando email de reset a {to_email}: {e}")
-        print(f"   Codigo (desarrollo): {code}")
-        return False, str(e)
+
+    print(f"[ERROR] Error enviando email de reset a {to_email}: {err}")
+    print(f"   Codigo (desarrollo): {code}")
+    return False, err
 
 
 def send_contact_email(to_email, subject, body, sender_name, sender_email):
     """Envía un mensaje de contacto entre empleador y candidato."""
-    import smtplib
-    from email.message import EmailMessage
+    clean_subject = subject.strip() or "Nuevo mensaje de contacto - Necting"
+    sender_name = sender_name or "Un empleador en Necting"
+    sender_email_text = f" ({sender_email})" if sender_email else ""
+    full_body = (
+        f"Has recibido un nuevo mensaje en Necting de {sender_name}{sender_email_text}:\n\n"
+        f"{body}\n\n"
+        "Responde a este correo o ponte en contacto directamente con la persona que te escribió."
+    )
 
-    smtp_host = os.environ.get("SMTP_HOST", "").strip()
-    smtp_port_str = (os.environ.get("SMTP_PORT") or "587").strip() or "587"
-    try:
-        smtp_port = int(smtp_port_str)
-    except ValueError:
-        smtp_port = 587
-    smtp_user = (os.environ.get("SMTP_USER") or "").strip()
-    smtp_pass = os.environ.get("SMTP_PASS") or ""
-
-    if not all([smtp_host, smtp_user, smtp_pass]):
-        print(f"[AVISO] SMTP no configurado. Mensaje de contacto para {to_email}.")
-        return False, "Configuración SMTP incompleta en .env"
-
-    try:
-        msg = EmailMessage()
-        clean_subject = subject.strip() or "Nuevo mensaje de contacto - Necting"
-        msg["Subject"] = f"[Necting] {clean_subject}"
-        msg["From"] = os.environ.get("SMTP_FROM", smtp_user)
-        msg["To"] = to_email
-        if sender_email:
-            msg["Reply-To"] = sender_email
-
-        sender_name = sender_name or "Un empleador en Necting"
-        sender_email_text = f" ({sender_email})" if sender_email else ""
-
-        msg.set_content(
-            f"Has recibido un nuevo mensaje en Necting de {sender_name}{sender_email_text}:\n\n"
-            f"{body}\n\n"
-            "Responde a este correo o ponte en contacto directamente con la persona que te escribió."
-        )
-
-        server = smtplib.SMTP(smtp_host, smtp_port)
-        server.starttls()
-        server.login(smtp_user, smtp_pass)
-        server.send_message(msg)
-        server.quit()
+    ok, err = _send_email(
+        to_email,
+        f"[Necting] {clean_subject}",
+        full_body,
+        reply_to=sender_email or None,
+    )
+    if ok:
         print(f"[OK] Email de contacto enviado a {to_email}")
         return True, None
-    except Exception as e:
-        print(f"[ERROR] Error enviando email de contacto a {to_email}: {e}")
-        return False, str(e)
+
+    print(f"[ERROR] Error enviando email de contacto a {to_email}: {err}")
+    return False, err
 
 # Recuperación de contraseña: tiempos y límites
 PASSWORD_RESET_CODE_EXPIRY_MINUTES = 10
