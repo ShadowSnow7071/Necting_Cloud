@@ -1,11 +1,11 @@
 pipeline {
-    agent any
+    agent { label 'windows' }
 
     options {
         timestamps()
         disableConcurrentBuilds()
     }
-
+    
     environment {
         VENV_DIR = '.venv'
         PIP_DISABLE_PIP_VERSION_CHECK = '1'
