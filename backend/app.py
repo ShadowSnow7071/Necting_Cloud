@@ -16,7 +16,7 @@ import cloudinary
 import cloudinary.uploader
 
 # Obtener la ruta del directorio del proyecto
-
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Cargar .env desde el directorio backend (donde está app.py)
 # Forzar que las variables definidas en backend/.env sobrescriban las del entorno del sistema en desarrollo
