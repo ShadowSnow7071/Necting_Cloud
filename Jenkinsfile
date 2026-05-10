@@ -90,7 +90,7 @@ pipeline {
 
         stage('Wait Render Deploy') {
             when {
-                branch 'main'
+                expression { env.BRANCH_NAME == 'main' || env.GIT_BRANCH == 'origin/main' }
             }
             steps {
                 script {
@@ -221,7 +221,7 @@ PY
         stage('Post-Deploy Health Check') {
             when {
                 allOf {
-                    branch 'main'
+                    expression { env.BRANCH_NAME == 'main' || env.GIT_BRANCH == 'origin/main' }
                     expression { env.DEPLOY_FAILED != 'true' }
                 }
             }
@@ -278,7 +278,7 @@ PY
         stage('Auto Rollback by Git Revert') {
             when {
                 allOf {
-                    branch 'main'
+                    expression { env.BRANCH_NAME == 'main' || env.GIT_BRANCH == 'origin/main' }
                     expression { env.DEPLOY_FAILED == 'true' || env.HEALTH_FAILED == 'true' }
                 }
             }
