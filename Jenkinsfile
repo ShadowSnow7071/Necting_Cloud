@@ -274,10 +274,7 @@ PY
                 script {
                     def lastMessage = isUnix()
                         ? sh(script: "git --no-pager log -1 --pretty=%B", returnStdout: true).trim()
-                        : bat(script: '''
-@echo off
-git --no-pager log -1 --pretty=%B
-''', returnStdout: true).trim()
+                        : powershell(script: 'git --no-pager log -1 --pretty=%B', returnStdout: true).trim()
 
                     if (lastMessage.contains('[auto-rollback]')) {
                         echo 'Guardrail anti-loop: commit ya marcado con [auto-rollback], no se ejecuta otro revert.'
