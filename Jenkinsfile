@@ -14,10 +14,6 @@ pipeline {
         // URL falsa intencional para probar rollback
         APP_URL = 'https://necting-cloud-FAKE.onrender.com'
 
-        DEPLOY_FAILED = 'false'
-        HEALTH_FAILED = 'false'
-        AUTO_ROLLBACK = 'false'
-
         HEALTH_RETRIES = '5'
         HEALTH_SLEEP_SECONDS = '10'
 
@@ -128,40 +124,21 @@ pipeline {
             }
 
             steps {
-                script {
 
-                    echo '[Wait Render Deploy] Esperando 60 segundos para despliegue Render...'
+                echo '[Wait Render Deploy] Esperando 60 segundos para despliegue Render...'
 
-                    sleep time: 60, unit: 'SECONDS'
+                sleep time: 60, unit: 'SECONDS'
 
-                    echo '[Wait Render Deploy] Espera terminada.'
-
-                }
-            }
-
-            post {
-                unsuccessful {
-                    script {
-                        env.DEPLOY_FAILED = 'true'
-                        echo 'Deploy guardrail activado: deploy_failed.'
-                    }
-                }
+                echo '[Wait Render Deploy] Espera terminada.'
             }
         }
 
-        stage('Post-Deploy Health Check') {
+        stage('Post-Deploy Health Check + Auto Rollback') {
 
             when {
-                allOf {
-
-                    expression {
-                        env.BRANCH_NAME == 'main' ||
-                        env.GIT_BRANCH == 'origin/main'
-                    }
-
-                    expression {
-                        env.DEPLOY_FAILED != 'true'
-                    }
+                expression {
+                    env.BRANCH_NAME == 'main' ||
+                    env.GIT_BRANCH == 'origin/main'
                 }
             }
 
@@ -170,6 +147,7 @@ pipeline {
                 script {
 
                     def retries = env.HEALTH_RETRIES.toInteger()
+                    def healthOk = false
 
                     for (int attempt = 1; attempt <= retries; attempt++) {
 
@@ -195,27 +173,16 @@ pipeline {
 
                                     $url = "$env:APP_URL/health"
 
-                                    try {
+                                    $res = Invoke-WebRequest `
+                                        -Uri $url `
+                                        -Method Get `
+                                        -UseBasicParsing `
+                                        -TimeoutSec 20
 
-                                        $res = Invoke-WebRequest `
-                                            -Uri $url `
-                                            -Method Get `
-                                            -UseBasicParsing `
-                                            -TimeoutSec 20
+                                    Write-Host "[Health Check] status=$($res.StatusCode)"
 
-                                        Write-Host "[Health Check] status=$($res.StatusCode)"
-
-                                        if ($res.StatusCode -ne 200) {
-                                            throw "Status inesperado"
-                                        }
-
-                                    }
-                                    catch {
-
-                                        Write-Host "[Health Check] fallo"
-
-                                        throw
-
+                                    if ($res.StatusCode -ne 200) {
+                                        throw "Status inesperado"
                                     }
 
                                 '''
@@ -224,125 +191,94 @@ pipeline {
 
                             echo "[Health Check] OK en intento ${attempt}/${retries}"
 
+                            healthOk = true
+
                             break
 
                         }
                         catch (Exception err) {
 
-                            if (attempt == retries) {
+                            echo "[Health Check] fallo en intento ${attempt}/${retries}"
 
-                                env.HEALTH_FAILED = 'true'
+                            if (attempt < retries) {
 
-                                currentBuild.result = 'UNSTABLE'
+                                sleep time: env.HEALTH_SLEEP_SECONDS.toInteger(), unit: 'SECONDS'
 
-                                echo 'Deploy guardrail activado: health_failed.'
-
-                                break
                             }
-
-                            echo "[Health Check] reintento ${attempt}/${retries}"
-
-                            sleep time: env.HEALTH_SLEEP_SECONDS.toInteger(), unit: 'SECONDS'
-                        }
-                    }
-                }
-            }
-        }
-
-        stage('Auto Rollback by Git Revert') {
-
-            when {
-                allOf {
-
-                    expression {
-                        env.BRANCH_NAME == 'main' ||
-                        env.GIT_BRANCH == 'origin/main'
-                    }
-
-                    expression {
-                        env.DEPLOY_FAILED == 'true' ||
-                        env.HEALTH_FAILED == 'true'
-                    }
-                }
-            }
-
-            steps {
-
-                script {
-
-                    def lastMessage = isUnix()
-                        ? sh(
-                            script: 'git --no-pager log -1 --pretty=%B',
-                            returnStdout: true
-                        ).trim()
-                        : powershell(
-                            script: 'git --no-pager log -1 --pretty=%B',
-                            returnStdout: true
-                        ).trim()
-
-                    if (lastMessage.contains('[auto-rollback]')) {
-
-                        echo 'Guardrail anti-loop activo.'
-
-                        return
-                    }
-
-                    def rollbackReason =
-                        env.DEPLOY_FAILED == 'true'
-                        ? 'deploy_failed'
-                        : 'health_failed'
-
-                    withCredentials([
-                        string(
-                            credentialsId: 'GH_BOT_TOKEN',
-                            variable: 'GH_BOT_TOKEN'
-                        )
-                    ]) {
-
-                        if (isUnix()) {
-
-                            sh """
-                                set -e
-
-                                git config user.name "${GH_BOT_NAME}"
-                                git config user.email "${GH_BOT_EMAIL}"
-
-                                git revert --no-commit ${GIT_COMMIT}
-
-                                git commit -m "[auto-rollback] Revert ${GIT_COMMIT} (${rollbackReason})"
-
-                                auth_header=\$(printf "x-access-token:${GH_BOT_TOKEN}" | base64 | tr -d '\\n')
-
-                                git -c http.https://github.com/.extraheader="AUTHORIZATION: basic \${auth_header}" push origin HEAD:${BRANCH_NAME}
-                            """
-
-                        } else {
-
-                            powershell '''
-
-                                $ErrorActionPreference = "Stop"
-
-                                git config user.name "$env:GH_BOT_NAME"
-                                git config user.email "$env:GH_BOT_EMAIL"
-
-                                git revert --no-commit $env:GIT_COMMIT
-
-                                git commit -m "[auto-rollback] Revert $env:GIT_COMMIT"
-
-                                $bytes = [System.Text.Encoding]::UTF8.GetBytes("x-access-token:$env:GH_BOT_TOKEN")
-
-                                $authHeader = [Convert]::ToBase64String($bytes)
-
-                                git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $authHeader" push origin "HEAD:$env:BRANCH_NAME"
-
-                            '''
-
                         }
                     }
 
-                    env.AUTO_ROLLBACK = 'true'
+                    if (!healthOk) {
 
-                    echo "Auto rollback completado. Motivo=${rollbackReason}"
+                        echo 'Deploy guardrail activado: health_failed.'
+
+                        def lastMessage = isUnix()
+                            ? sh(
+                                script: 'git --no-pager log -1 --pretty=%B',
+                                returnStdout: true
+                            ).trim()
+                            : powershell(
+                                script: 'git --no-pager log -1 --pretty=%B',
+                                returnStdout: true
+                            ).trim()
+
+                        if (lastMessage.contains('[auto-rollback]')) {
+
+                            echo 'Guardrail anti-loop activo.'
+
+                            error('Rollback detenido por anti-loop.')
+                        }
+
+                        withCredentials([
+                            string(
+                                credentialsId: 'GH_BOT_TOKEN',
+                                variable: 'GH_BOT_TOKEN'
+                            )
+                        ]) {
+
+                            if (isUnix()) {
+
+                                sh """
+                                    set -e
+
+                                    git config user.name "${GH_BOT_NAME}"
+                                    git config user.email "${GH_BOT_EMAIL}"
+
+                                    git revert --no-commit ${GIT_COMMIT}
+
+                                    git commit -m "[auto-rollback] Revert ${GIT_COMMIT} (health_failed)"
+
+                                    auth_header=\$(printf "x-access-token:${GH_BOT_TOKEN}" | base64 | tr -d '\\n')
+
+                                    git -c http.https://github.com/.extraheader="AUTHORIZATION: basic \${auth_header}" push origin HEAD:${BRANCH_NAME}
+                                """
+
+                            } else {
+
+                                powershell '''
+
+                                    $ErrorActionPreference = "Stop"
+
+                                    git config user.name "$env:GH_BOT_NAME"
+                                    git config user.email "$env:GH_BOT_EMAIL"
+
+                                    git revert --no-commit $env:GIT_COMMIT
+
+                                    git commit -m "[auto-rollback] Revert $env:GIT_COMMIT (health_failed)"
+
+                                    $bytes = [System.Text.Encoding]::UTF8.GetBytes("x-access-token:$env:GH_BOT_TOKEN")
+
+                                    $authHeader = [Convert]::ToBase64String($bytes)
+
+                                    git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $authHeader" push origin "HEAD:$env:BRANCH_NAME"
+
+                                '''
+
+                            }
+                        }
+
+                        error('Health check failed. Rollback ejecutado.')
+                    }
                 }
             }
         }
@@ -362,19 +298,6 @@ pipeline {
 
                     bat 'if exist %VENV_DIR% rmdir /s /q %VENV_DIR%'
 
-                }
-            }
-
-            script {
-
-                echo "Deploy guardrails => deploy_failed=${env.DEPLOY_FAILED}, health_failed=${env.HEALTH_FAILED}, auto_rollback=${env.AUTO_ROLLBACK}"
-
-                if (env.DEPLOY_FAILED == 'true') {
-                    echo 'Resultado deploy_failed.'
-                }
-
-                if (env.HEALTH_FAILED == 'true') {
-                    echo 'Resultado health_failed.'
                 }
             }
         }
