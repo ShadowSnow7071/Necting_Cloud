@@ -2127,6 +2127,11 @@ def favicon():
     """Maneja la solicitud de favicon"""
     return '', 204  # No Content - el navegador dejará de solicitarlo
 
+@app.route('/health')
+def health():
+    """Health check simple para monitoreo/deploy."""
+    return jsonify({'status': 'ok'}), 200
+
 if __name__ == '__main__':
     PORT = 5000
     print("\n" + "="*50)
