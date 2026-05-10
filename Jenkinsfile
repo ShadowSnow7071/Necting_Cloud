@@ -43,9 +43,9 @@ pipeline {
                     } else {
                         bat """
                             python -m venv %VENV_DIR%
-                            call %VENV_DIR%\\Scripts\\activate.bat
+                            call %VENV_DIR%\Scripts\activate.bat
                             python -m pip install --upgrade pip
-                            pip install -r backend\\requirements.txt
+                            pip install -r backend\requirements.txt
                         """
                     }
                 }
@@ -62,7 +62,7 @@ pipeline {
                         '''
                     } else {
                         bat """
-                            call %VENV_DIR%\\Scripts\\activate.bat
+                            call %VENV_DIR%\Scripts\activate.bat
                             python -m compileall backend
                         """
                     }
@@ -80,132 +80,24 @@ pipeline {
                         '''
                     } else {
                         bat """
-                            call %VENV_DIR%\\Scripts\\activate.bat
-                            python -m unittest discover -s backend\\tests -p "test_*.py" -v
+                            call %VENV_DIR%\Scripts\activate.bat
+                            python -m unittest discover -s backend\tests -p "test_*.py" -v
                         """
                     }
                 }
             }
         }
 
+        // AJUSTE: espera fija sin polling SHA - demo universidad
         stage('Wait Render Deploy') {
             when {
                 expression { env.BRANCH_NAME == 'main' || env.GIT_BRANCH == 'origin/main' }
             }
             steps {
                 script {
-                    catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
-                        withCredentials([
-                            string(credentialsId: 'RENDER_API_KEY', variable: 'RENDER_API_KEY'),
-                            string(credentialsId: 'RENDER_SERVICE_ID', variable: 'RENDER_SERVICE_ID')
-                        ]) {
-                            timeout(time: env.DEPLOY_TIMEOUT_MINUTES.toInteger(), unit: 'MINUTES') {
-                                if (isUnix()) {
-                                    sh '''
-                                        . ${VENV_DIR}/bin/activate
-                                        python - <<'PY'
-import json
-import os
-import sys
-import time
-import requests
-
-api_base = os.environ['RENDER_API_BASE']
-service_id = os.environ['RENDER_SERVICE_ID']
-api_key = os.environ['RENDER_API_KEY']
-poll_seconds = int(os.environ['DEPLOY_POLL_SECONDS'])
-timeout_minutes = int(os.environ['DEPLOY_TIMEOUT_MINUTES'])
-# Safeguard extra: evita división por cero y garantiza al menos un intento.
-max_attempts = max(1, (timeout_minutes * 60) // max(1, poll_seconds) + 1)
-
-success_states = {'live'}
-failed_states = {'build_failed', 'update_failed', 'failed', 'canceled', 'cancelled'}
-
-url = f"{api_base}/services/{service_id}/deploys?limit=1"
-headers = {'Authorization': f'Bearer {api_key}', 'Accept': 'application/json'}
-
-attempt = 0
-while attempt < max_attempts:
-    attempt += 1
-    try:
-        resp = requests.get(url, headers=headers, timeout=30)
-        resp.raise_for_status()
-    except requests.RequestException as exc:
-        raise RuntimeError(f"Render API request failed on attempt {attempt}: {exc}") from exc
-    payload = resp.json()
-    deploy = {}
-    if isinstance(payload, list):
-        if payload:
-            deploy = payload[0]
-    elif isinstance(payload, dict):
-        data = payload.get('data')
-        if isinstance(data, list) and data:
-            deploy = data[0]
-        else:
-            deploy = payload
-    status = str((deploy or {}).get('status') or '').lower()
-    deploy_id = (deploy or {}).get('id') or 'n/a'
-    print(f"[Wait Render Deploy] attempt={attempt} deploy={deploy_id} status={status}")
-
-    if status in success_states:
-        print("[Wait Render Deploy] Deploy completado en estado exitoso.")
-        sys.exit(0)
-    if status in failed_states:
-        raise RuntimeError(f"Deploy falló con estado final: {status}")
-
-    time.sleep(poll_seconds)
-
-raise RuntimeError(f"Deploy no alcanzó estado final tras {max_attempts} intentos de polling")
-PY
-                                    '''
-                                } else {
-                                    powershell '''
-                                        $ErrorActionPreference = "Stop"
-                                        $apiBase = $env:RENDER_API_BASE
-                                        $serviceId = $env:RENDER_SERVICE_ID
-                                        $apiKey = $env:RENDER_API_KEY
-                                        $pollSeconds = [int]$env:DEPLOY_POLL_SECONDS
-                                        $timeoutMinutes = [int]$env:DEPLOY_TIMEOUT_MINUTES
-                                        $maxAttempts = [Math]::Max(1, [Math]::Floor(($timeoutMinutes * 60) / [Math]::Max(1, $pollSeconds)) + 1)
-                                        $url = "$apiBase/services/$serviceId/deploys?limit=1"
-                                        $headers = @{
-                                            Authorization = "Bearer $apiKey"
-                                            Accept = "application/json"
-                                        }
-                                        $attempt = 0
-                                        $deployCompleted = $false
-                                        while ($attempt -lt $maxAttempts) {
-                                            $attempt++
-                                            $response = Invoke-RestMethod -Method Get -Uri $url -Headers $headers
-                                            if ($response -is [array]) {
-                                                $deploy = $response[0]
-                                            } elseif ($response.data) {
-                                                $deploy = $response.data[0]
-                                            } else {
-                                                $deploy = $response
-                                            }
-                                            $status = "$($deploy.status)".ToLower()
-                                            $deployId = if ($deploy.id) { $deploy.id } else { "n/a" }
-                                            Write-Host "[Wait Render Deploy] attempt=$attempt deploy=$deployId status=$status"
-
-                                            if ($status -eq "live") {
-                                                Write-Host "[Wait Render Deploy] Deploy completado en estado exitoso."
-                                                $deployCompleted = $true
-                                                break
-                                            }
-                                            if (@("build_failed","update_failed","failed","canceled","cancelled") -contains $status) {
-                                                throw "Deploy falló con estado final: $status"
-                                            }
-                                            Start-Sleep -Seconds $pollSeconds
-                                        }
-                                        if (-not $deployCompleted) {
-                                            throw "Deploy no alcanzó estado final tras $maxAttempts intentos de polling"
-                                        }
-                                    '''
-                                }
-                            }
-                        }
-                    }
+                    echo "[Wait Render Deploy] Esperando 60 segundos tras CI para despliegue en Render (espera fija, sin búsqueda de SHA)..."
+                    sleep time: 60, unit: 'SECONDS'
+                    echo "[Wait Render Deploy] Espera terminada. Continuando con health check."
                 }
             }
             post {
@@ -289,7 +181,7 @@ PY
                         : powershell(script: 'git --no-pager log -1 --pretty=%B', returnStdout: true).trim()
 
                     if (lastMessage.contains('[auto-rollback]')) {
-                        echo 'Guardrail anti-loop: commit ya marcado con [auto-rollback], no se ejecuta otro revert.'
+                        echo 'Guardrail anti-loop: commit ya marcado con [auto-rollback], no se ejecuta otro revert.';
                         return
                     }
 
@@ -299,23 +191,23 @@ PY
                         if (isUnix()) {
                             sh """
                                 set -e
-                                git config user.name "${GH_BOT_NAME}"
-                                git config user.email "${GH_BOT_EMAIL}"
+                                git config user.name \"${GH_BOT_NAME}\"
+                                git config user.email \"${GH_BOT_EMAIL}\"
                                 git revert --no-commit ${GIT_COMMIT}
-                                git commit -m "[auto-rollback] Revert ${GIT_COMMIT} (${rollbackReason})"
-                                auth_header=\$(printf "x-access-token:${GH_BOT_TOKEN}" | base64 | tr -d '\\n')
-                                git -c http.https://github.com/.extraheader="AUTHORIZATION: basic \${auth_header}" push origin HEAD:${BRANCH_NAME}
+                                git commit -m \"[auto-rollback] Revert ${GIT_COMMIT} (${rollbackReason})\"
+                                auth_header=$(printf \"x-access-token:${GH_BOT_TOKEN}\" | base64 | tr -d '\\n')
+                                git -c http.https://github.com/.extraheader=\"AUTHORIZATION: basic ${auth_header}\" push origin HEAD:${BRANCH_NAME}
                             """
                         } else {
                             powershell """
-                                \$ErrorActionPreference = "Stop"
-                                git config user.name "${GH_BOT_NAME}"
-                                git config user.email "${GH_BOT_EMAIL}"
-                                git revert --no-commit \$env:GIT_COMMIT
-                                git commit -m "[auto-rollback] Revert \$env:GIT_COMMIT (${rollbackReason})"
-                                \$bytes = [System.Text.Encoding]::UTF8.GetBytes("x-access-token:\$env:GH_BOT_TOKEN")
-                                \$authHeader = [Convert]::ToBase64String(\$bytes)
-                                git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic \$authHeader" push origin "HEAD:\$env:BRANCH_NAME"
+                                $ErrorActionPreference = "Stop"
+                                git config user.name \"${GH_BOT_NAME}\"
+                                git config user.email \"${GH_BOT_EMAIL}\"
+                                git revert --no-commit $env:GIT_COMMIT
+                                git commit -m \"[auto-rollback] Revert $env:GIT_COMMIT (${rollbackReason})\"
+                                $bytes = [System.Text.Encoding]::UTF8.GetBytes(\"x-access-token:$env:GH_BOT_TOKEN\")
+                                $authHeader = [Convert]::ToBase64String($bytes)
+                                git -c \"http.https://github.com/.extraheader=AUTHORIZATION: basic $authHeader\" push origin \"HEAD:$env:BRANCH_NAME\"
                             """
                         }
                     }
@@ -339,10 +231,10 @@ PY
             script {
                 echo "Deploy guardrails => deploy_failed=${env.DEPLOY_FAILED}, health_failed=${env.HEALTH_FAILED}, auto_rollback=${env.AUTO_ROLLBACK}"
                 if (env.DEPLOY_FAILED == 'true') {
-                    echo 'Resultado deploy_failed: Render deploy no alcanzó estado exitoso.'
+                    echo 'Resultado deploy_failed: Render deploy no alcanzó estado exitoso.';
                 }
                 if (env.HEALTH_FAILED == 'true') {
-                    echo 'Resultado health_failed: health check post-deploy no alcanzó 200.'
+                    echo 'Resultado health_failed: health check post-deploy no alcanzó 200.';
                 }
             }
         }
