@@ -167,79 +167,76 @@ pipeline {
 
                 script {
 
-                    catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+                    def retries = env.HEALTH_RETRIES.toInteger()
 
-                        def retries = env.HEALTH_RETRIES.toInteger()
+                    for (int attempt = 1; attempt <= retries; attempt++) {
 
-                        for (int attempt = 1; attempt <= retries; attempt++) {
+                        try {
 
-                            try {
+                            if (isUnix()) {
 
-                                if (isUnix()) {
+                                sh '''
+                                    set -e
 
-                                    sh '''
-                                        set -e
+                                    code=$(curl -s -o /dev/null -w "%{http_code}" "${APP_URL}/health")
 
-                                        code=$(curl -s -o /dev/null -w "%{http_code}" "${APP_URL}/health")
+                                    echo "[Health Check] status=$code"
 
-                                        echo "[Health Check] status=$code"
+                                    test "$code" = "200"
+                                '''
 
-                                        test "$code" = "200"
-                                    '''
+                            } else {
 
-                                } else {
+                                powershell '''
 
-                                    powershell '''
+                                    $ErrorActionPreference = "Stop"
 
-                                        $ErrorActionPreference = "Stop"
+                                    $url = "$env:APP_URL/health"
 
-                                        $url = "$env:APP_URL/health"
+                                    try {
 
-                                        try {
+                                        $res = Invoke-WebRequest `
+                                            -Uri $url `
+                                            -Method Get `
+                                            -UseBasicParsing `
+                                            -TimeoutSec 20
 
-                                            $res = Invoke-WebRequest `
-                                                -Uri $url `
-                                                -Method Get `
-                                                -UseBasicParsing `
-                                                -TimeoutSec 20
+                                        Write-Host "[Health Check] status=$($res.StatusCode)"
 
-                                            Write-Host "[Health Check] status=$($res.StatusCode)"
-
-                                            if ($res.StatusCode -ne 200) {
-                                                throw "Status inesperado"
-                                            }
-
-                                        }
-                                        catch {
-
-                                            Write-Host "[Health Check] fallo"
-
-                                            throw
-
+                                        if ($res.StatusCode -ne 200) {
+                                            throw "Status inesperado"
                                         }
 
-                                    '''
+                                    }
+                                    catch {
 
-                                }
+                                        Write-Host "[Health Check] fallo"
 
-                                echo "[Health Check] OK en intento ${attempt}/${retries}"
+                                        throw
 
-                                break
+                                    }
+
+                                '''
 
                             }
-                            catch (Exception err) {
 
-                                if (attempt == retries) {
+                            echo "[Health Check] OK en intento ${attempt}/${retries}"
 
-                                    env.HEALTH_FAILED = 'true'
+                            break
 
-                                    throw err
-                                }
+                        }
+                        catch (Exception err) {
 
-                                echo "[Health Check] reintento ${attempt}/${retries}"
+                            if (attempt == retries) {
 
-                                sleep time: env.HEALTH_SLEEP_SECONDS.toInteger(), unit: 'SECONDS'
+                                env.HEALTH_FAILED = 'true'
+
+                                error("Health check failed")
                             }
+
+                            echo "[Health Check] reintento ${attempt}/${retries}"
+
+                            sleep time: env.HEALTH_SLEEP_SECONDS.toInteger(), unit: 'SECONDS'
                         }
                     }
                 }
@@ -248,8 +245,6 @@ pipeline {
             post {
                 unsuccessful {
                     script {
-
-                        env.HEALTH_FAILED = 'true'
 
                         echo 'Deploy guardrail activado: health_failed.'
 
