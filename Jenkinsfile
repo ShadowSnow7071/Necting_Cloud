@@ -11,7 +11,7 @@ pipeline {
         PIP_DISABLE_PIP_VERSION_CHECK = '1'
         PYTHONDONTWRITEBYTECODE = '1'
 
-       APP_URL = 'https://necting-cloud-FAKE.onrender.com'
+        APP_URL = 'https://necting-cloud-FAKE.onrender.com'
 
         DEPLOY_FAILED = 'false'
         HEALTH_FAILED = 'false'
@@ -117,7 +117,6 @@ pipeline {
             }
         }
 
-        // Espera fija para Render
         stage('Wait Render Deploy') {
 
             when {
@@ -231,6 +230,9 @@ pipeline {
                             catch (Exception err) {
 
                                 if (attempt == retries) {
+
+                                    env.HEALTH_FAILED = 'true'
+
                                     throw err
                                 }
 
