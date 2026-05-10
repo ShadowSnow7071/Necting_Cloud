@@ -140,7 +140,7 @@ while True:
             deploy = payload
     status = str((deploy or {}).get('status') or '').lower()
     deploy_id = (deploy or {}).get('id') or 'n/a'
-    print(f"[Wait Render Deploy] intento={attempt} deploy={deploy_id} status={status}")
+    print(f"[Wait Render Deploy] attempt={attempt} deploy={deploy_id} status={status}")
 
     if status in success_states:
         print("[Wait Render Deploy] Deploy completado en estado exitoso.")
@@ -176,7 +176,7 @@ PY
                                             }
                                             $status = "$($deploy.status)".ToLower()
                                             $deployId = if ($deploy.id) { $deploy.id } else { "n/a" }
-                                            Write-Host "[Wait Render Deploy] intento=$attempt deploy=$deployId status=$status"
+                                            Write-Host "[Wait Render Deploy] attempt=$attempt deploy=$deployId status=$status"
 
                                             if ($status -eq "live") {
                                                 Write-Host "[Wait Render Deploy] Deploy completado en estado exitoso."
@@ -292,20 +292,19 @@ git --no-pager log -1 --pretty=%B
                                 git config user.email "${GH_BOT_EMAIL}"
                                 git revert --no-commit ${GIT_COMMIT}
                                 git commit -m "[auto-rollback] Revert ${GIT_COMMIT} (${rollbackReason})"
-                                remote_url=\$(git config --get remote.origin.url)
-                                auth_url=\${remote_url/https:\\/\\//https:\\/\\/${GH_BOT_TOKEN}@}
-                                git push "\${auth_url}" HEAD:${BRANCH_NAME}
+                                auth_header=\$(printf "x-access-token:${GH_BOT_TOKEN}" | base64 | tr -d '\\n')
+                                git -c http.https://github.com/.extraheader="AUTHORIZATION: basic \${auth_header}" push origin HEAD:${BRANCH_NAME}
                             """
                         } else {
-                            bat """
-                                @echo off
+                            powershell """
+                                \$ErrorActionPreference = "Stop"
                                 git config user.name "${GH_BOT_NAME}"
                                 git config user.email "${GH_BOT_EMAIL}"
-                                git revert --no-commit %GIT_COMMIT%
-                                git commit -m "[auto-rollback] Revert %GIT_COMMIT% (${rollbackReason})"
-                                for /f "delims=" %%i in ('git config --get remote.origin.url') do set REMOTE_URL=%%i
-                                set AUTH_URL=%REMOTE_URL:https://=https://%GH_BOT_TOKEN%@%
-                                git push "%AUTH_URL%" HEAD:%BRANCH_NAME%
+                                git revert --no-commit \$env:GIT_COMMIT
+                                git commit -m "[auto-rollback] Revert \$env:GIT_COMMIT (${rollbackReason})"
+                                \$bytes = [System.Text.Encoding]::UTF8.GetBytes("x-access-token:\$env:GH_BOT_TOKEN")
+                                \$authHeader = [Convert]::ToBase64String(\$bytes)
+                                git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic \$authHeader" push origin "HEAD:\$env:BRANCH_NAME"
                             """
                         }
                     }
