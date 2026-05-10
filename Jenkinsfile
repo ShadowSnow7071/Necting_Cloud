@@ -11,7 +11,7 @@ pipeline {
         PIP_DISABLE_PIP_VERSION_CHECK = '1'
         PYTHONDONTWRITEBYTECODE = '1'
 
-        APP_URL = 'https://necting-cloud.onrender.com'
+       APP_URL = 'https://necting-cloud-FAKE.onrender.com'
 
         DEPLOY_FAILED = 'false'
         HEALTH_FAILED = 'false'
