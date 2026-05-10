@@ -128,7 +128,16 @@ while True:
     if resp.status_code >= 400:
         raise RuntimeError(f"Render API error {resp.status_code}: {resp.text[:200]}")
     payload = resp.json()
-    deploy = payload[0] if isinstance(payload, list) and payload else (payload.get('data') or [{}])[0]
+    deploy = {}
+    if isinstance(payload, list):
+        if payload:
+            deploy = payload[0]
+    elif isinstance(payload, dict):
+        data = payload.get('data')
+        if isinstance(data, list) and data:
+            deploy = data[0]
+        else:
+            deploy = payload
     status = str((deploy or {}).get('status') or '').lower()
     deploy_id = (deploy or {}).get('id') or 'n/a'
     print(f"[Wait Render Deploy] intento={attempt} deploy={deploy_id} status={status}")
@@ -205,29 +214,39 @@ PY
             steps {
                 script {
                     catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
-                        retry(env.HEALTH_RETRIES.toInteger()) {
-                            if (isUnix()) {
-                                sh '''
-                                    set -e
-                                    code=$(curl -s -o /dev/null -w "%{http_code}" "${APP_URL}/health")
-                                    echo "[Health Check] status=$code url=${APP_URL}/health"
-                                    test "$code" = "200"
-                                '''
-                            } else {
-                                powershell '''
-                                    $ErrorActionPreference = "Stop"
-                                    $url = "$env:APP_URL/health"
-                                    try {
-                                        $res = Invoke-WebRequest -Uri $url -Method Get -UseBasicParsing -TimeoutSec 20
-                                        Write-Host "[Health Check] status=$($res.StatusCode) url=$url"
-                                        if ($res.StatusCode -ne 200) { throw "Status inesperado: $($res.StatusCode)" }
-                                    } catch {
-                                        Write-Host "[Health Check] fallo en intento: $($_.Exception.Message)"
-                                        throw
-                                    }
-                                '''
+                        def retries = env.HEALTH_RETRIES.toInteger()
+                        for (int attempt = 1; attempt <= retries; attempt++) {
+                            try {
+                                if (isUnix()) {
+                                    sh '''
+                                        set -e
+                                        code=$(curl -s -o /dev/null -w "%{http_code}" "${APP_URL}/health")
+                                        echo "[Health Check] status=$code url=${APP_URL}/health"
+                                        test "$code" = "200"
+                                    '''
+                                } else {
+                                    powershell '''
+                                        $ErrorActionPreference = "Stop"
+                                        $url = "$env:APP_URL/health"
+                                        try {
+                                            $res = Invoke-WebRequest -Uri $url -Method Get -UseBasicParsing -TimeoutSec 20
+                                            Write-Host "[Health Check] status=$($res.StatusCode) url=$url"
+                                            if ($res.StatusCode -ne 200) { throw "Status inesperado: $($res.StatusCode)" }
+                                        } catch {
+                                            Write-Host "[Health Check] fallo en intento: $($_.Exception.Message)"
+                                            throw
+                                        }
+                                    '''
+                                }
+                                echo "[Health Check] OK en intento ${attempt}/${retries}"
+                                break
+                            } catch (Exception err) {
+                                if (attempt == retries) {
+                                    throw err
+                                }
+                                echo "[Health Check] reintento ${attempt}/${retries} falló, esperando ${env.HEALTH_SLEEP_SECONDS}s..."
+                                sleep time: env.HEALTH_SLEEP_SECONDS.toInteger(), unit: 'SECONDS'
                             }
-                            sleep time: env.HEALTH_SLEEP_SECONDS.toInteger(), unit: 'SECONDS'
                         }
                     }
                 }
@@ -253,7 +272,10 @@ PY
                 script {
                     def lastMessage = isUnix()
                         ? sh(script: "git --no-pager log -1 --pretty=%B | cat", returnStdout: true).trim()
-                        : bat(script: "@echo off\r\ngit --no-pager log -1 --pretty=%%B", returnStdout: true).trim()
+                        : bat(script: '''
+@echo off
+git --no-pager log -1 --pretty=%B
+''', returnStdout: true).trim()
 
                     if (lastMessage.contains('[auto-rollback]')) {
                         echo 'Guardrail anti-loop: commit ya marcado con [auto-rollback], no se ejecuta otro revert.'
