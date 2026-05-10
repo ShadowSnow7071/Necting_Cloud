@@ -131,7 +131,7 @@ pipeline {
                                         test "$code" = "200"
                                     '''
                                 } else {
-                                    powershell '''
+                                    powershell """
                                         $ErrorActionPreference = "Stop"
                                         $url = "$env:APP_URL/health"
                                         try {
@@ -142,7 +142,7 @@ pipeline {
                                             Write-Host "[Health Check] fallo en intento: $($_.Exception.Message)"
                                             throw
                                         }
-                                    '''
+                                    """
                                 }
                                 echo "[Health Check] OK en intento ${attempt}/${retries}"
                                 break
@@ -191,23 +191,23 @@ pipeline {
                         if (isUnix()) {
                             sh """
                                 set -e
-                                git config user.name \"${GH_BOT_NAME}\"
-                                git config user.email \"${GH_BOT_EMAIL}\"
+                                git config user.name "${GH_BOT_NAME}"
+                                git config user.email "${GH_BOT_EMAIL}"
                                 git revert --no-commit ${GIT_COMMIT}
-                                git commit -m \"[auto-rollback] Revert ${GIT_COMMIT} (${rollbackReason})\"
-                                auth_header=$(printf \"x-access-token:${GH_BOT_TOKEN}\" | base64 | tr -d '\\n')
-                                git -c http.https://github.com/.extraheader=\"AUTHORIZATION: basic ${auth_header}\" push origin HEAD:${BRANCH_NAME}
+                                git commit -m "[auto-rollback] Revert ${GIT_COMMIT} (${rollbackReason})"
+                                auth_header=$(printf "x-access-token:${GH_BOT_TOKEN}" | base64 | tr -d '\n')
+                                git -c http.https://github.com/.extraheader="AUTHORIZATION: basic ${auth_header}" push origin HEAD:${BRANCH_NAME}
                             """
                         } else {
                             powershell """
                                 $ErrorActionPreference = "Stop"
-                                git config user.name \"${GH_BOT_NAME}\"
-                                git config user.email \"${GH_BOT_EMAIL}\"
+                                git config user.name "$env:GH_BOT_NAME"
+                                git config user.email "$env:GH_BOT_EMAIL"
                                 git revert --no-commit $env:GIT_COMMIT
-                                git commit -m \"[auto-rollback] Revert $env:GIT_COMMIT (${rollbackReason})\"
-                                $bytes = [System.Text.Encoding]::UTF8.GetBytes(\"x-access-token:$env:GH_BOT_TOKEN\")
+                                git commit -m "[auto-rollback] Revert $env:GIT_COMMIT (${rollbackReason})"
+                                $bytes = [System.Text.Encoding]::UTF8.GetBytes("x-access-token:$env:GH_BOT_TOKEN")
                                 $authHeader = [Convert]::ToBase64String($bytes)
-                                git -c \"http.https://github.com/.extraheader=AUTHORIZATION: basic $authHeader\" push origin \"HEAD:$env:BRANCH_NAME\"
+                                git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $authHeader" push origin "HEAD:$env:BRANCH_NAME"
                             """
                         }
                     }
