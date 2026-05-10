@@ -124,9 +124,11 @@ headers = {'Authorization': f'Bearer {api_key}', 'Accept': 'application/json'}
 attempt = 0
 while True:
     attempt += 1
-    resp = requests.get(url, headers=headers, timeout=30)
-    if resp.status_code >= 400:
-        raise RuntimeError(f"Render API error {resp.status_code}: {resp.text[:200]}")
+    try:
+        resp = requests.get(url, headers=headers, timeout=30)
+        resp.raise_for_status()
+    except requests.RequestException as exc:
+        raise RuntimeError(f"Render API request failed on attempt {attempt}: {exc}") from exc
     payload = resp.json()
     deploy = {}
     if isinstance(payload, list):
