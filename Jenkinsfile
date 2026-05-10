@@ -114,6 +114,8 @@ api_base = os.environ['RENDER_API_BASE']
 service_id = os.environ['RENDER_SERVICE_ID']
 api_key = os.environ['RENDER_API_KEY']
 poll_seconds = int(os.environ['DEPLOY_POLL_SECONDS'])
+timeout_minutes = int(os.environ['DEPLOY_TIMEOUT_MINUTES'])
+max_attempts = max(1, (timeout_minutes * 60) // max(1, poll_seconds) + 1)
 
 success_states = {'live'}
 failed_states = {'build_failed', 'update_failed', 'failed', 'canceled', 'cancelled'}
@@ -122,7 +124,7 @@ url = f"{api_base}/services/{service_id}/deploys?limit=1"
 headers = {'Authorization': f'Bearer {api_key}', 'Accept': 'application/json'}
 
 attempt = 0
-while True:
+while attempt < max_attempts:
     attempt += 1
     try:
         resp = requests.get(url, headers=headers, timeout=30)
@@ -151,6 +153,8 @@ while True:
         raise RuntimeError(f"Deploy falló con estado final: {status}")
 
     time.sleep(poll_seconds)
+
+raise RuntimeError(f"Deploy no alcanzó estado final tras {max_attempts} intentos de polling")
 PY
                                     '''
                                 } else {
@@ -160,13 +164,15 @@ PY
                                         $serviceId = $env:RENDER_SERVICE_ID
                                         $apiKey = $env:RENDER_API_KEY
                                         $pollSeconds = [int]$env:DEPLOY_POLL_SECONDS
+                                        $timeoutMinutes = [int]$env:DEPLOY_TIMEOUT_MINUTES
+                                        $maxAttempts = [Math]::Max(1, [Math]::Floor(($timeoutMinutes * 60) / [Math]::Max(1, $pollSeconds)) + 1)
                                         $url = "$apiBase/services/$serviceId/deploys?limit=1"
                                         $headers = @{
                                             Authorization = "Bearer $apiKey"
                                             Accept = "application/json"
                                         }
                                         $attempt = 0
-                                        while ($true) {
+                                        while ($attempt -lt $maxAttempts) {
                                             $attempt++
                                             $response = Invoke-RestMethod -Method Get -Uri $url -Headers $headers
                                             if ($response -is [array]) {
@@ -189,6 +195,7 @@ PY
                                             }
                                             Start-Sleep -Seconds $pollSeconds
                                         }
+                                        throw "Deploy no alcanzó estado final tras $maxAttempts intentos de polling"
                                     '''
                                 }
                             }
