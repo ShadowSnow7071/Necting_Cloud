@@ -43,9 +43,9 @@ pipeline {
                     } else {
                         bat """
                             python -m venv %VENV_DIR%
-                            call %VENV_DIR%\Scripts\activate.bat
+                            call %VENV_DIR%\\Scripts\\activate.bat
                             python -m pip install --upgrade pip
-                            pip install -r backend\requirements.txt
+                            pip install -r backend\\requirements.txt
                         """
                     }
                 }
@@ -62,7 +62,7 @@ pipeline {
                         '''
                     } else {
                         bat """
-                            call %VENV_DIR%\Scripts\activate.bat
+                            call %VENV_DIR%\\Scripts\\activate.bat
                             python -m compileall backend
                         """
                     }
@@ -80,8 +80,8 @@ pipeline {
                         '''
                     } else {
                         bat """
-                            call %VENV_DIR%\Scripts\activate.bat
-                            python -m unittest discover -s backend\tests -p "test_*.py" -v
+                            call %VENV_DIR%\\Scripts\\activate.bat
+                            python -m unittest discover -s backend\\tests -p "test_*.py" -v
                         """
                     }
                 }
