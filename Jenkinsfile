@@ -11,8 +11,8 @@ pipeline {
         PIP_DISABLE_PIP_VERSION_CHECK = '1'
         PYTHONDONTWRITEBYTECODE = '1'
 
-        // URL falsa intencional para probar rollback
-        APP_URL = 'https://necting-cloud-FAKE.onrender.com'
+        // URL publica real del backend desplegado en Render
+        APP_URL = 'https://necting-cloud.onrender.com'
 
         HEALTH_RETRIES = '5'
         HEALTH_SLEEP_SECONDS = '10'
@@ -125,9 +125,9 @@ pipeline {
 
             steps {
 
-                echo '[Wait Render Deploy] Esperando 60 segundos para despliegue Render...'
+                echo '[Wait Render Deploy] Esperando 120 segundos para despliegue Render...'
 
-                sleep time: 60, unit: 'SECONDS'
+                sleep time: 120, unit: 'SECONDS'
 
                 echo '[Wait Render Deploy] Espera terminada.'
             }
@@ -158,6 +158,8 @@ pipeline {
                                 sh '''
                                     set -e
 
+                                    echo "[Health Check] Checking URL: ${APP_URL}/health"
+
                                     code=$(curl -s -o /dev/null -w "%{http_code}" "${APP_URL}/health")
 
                                     echo "[Health Check] status=$code"
@@ -172,6 +174,8 @@ pipeline {
                                     $ErrorActionPreference = "Stop"
 
                                     $url = "$env:APP_URL/health"
+
+                                    Write-Host "[Health Check] Checking URL: $url"
 
                                     $res = Invoke-WebRequest `
                                         -Uri $url `
@@ -229,6 +233,10 @@ pipeline {
                             error('Rollback detenido por anti-loop.')
                         }
 
+                        def targetBranch = (env.BRANCH_NAME?.trim())
+                            ? env.BRANCH_NAME.trim()
+                            : 'main'
+
                         withCredentials([
                             string(
                                 credentialsId: 'GH_BOT_TOKEN',
@@ -244,13 +252,21 @@ pipeline {
                                     git config user.name "${GH_BOT_NAME}"
                                     git config user.email "${GH_BOT_EMAIL}"
 
-                                    git revert --no-commit ${GIT_COMMIT}
+                                    git fetch origin ${targetBranch}
+                                    git checkout -B ${targetBranch} origin/${targetBranch}
+
+                                    parent_count=$(git show --no-patch --format=%P ${GIT_COMMIT} | wc -w | tr -d ' ')
+                                    if [ "$parent_count" -gt "1" ]; then
+                                      git revert -m 1 --no-commit ${GIT_COMMIT}
+                                    else
+                                      git revert --no-commit ${GIT_COMMIT}
+                                    fi
 
                                     git commit -m "[auto-rollback] Revert ${GIT_COMMIT} (health_failed)"
 
                                     auth_header=\$(printf "x-access-token:${GH_BOT_TOKEN}" | base64 | tr -d '\\n')
 
-                                    git -c http.https://github.com/.extraheader="AUTHORIZATION: basic \${auth_header}" push origin HEAD:${BRANCH_NAME}
+                                    git -c http.https://github.com/.extraheader="AUTHORIZATION: basic \${auth_header}" push origin HEAD:${targetBranch}
                                 """
 
                             } else {
@@ -259,18 +275,46 @@ pipeline {
 
                                     $ErrorActionPreference = "Stop"
 
+                                    Write-Host "[Rollback] Starting rollback process"
+
                                     git config user.name "$env:GH_BOT_NAME"
                                     git config user.email "$env:GH_BOT_EMAIL"
 
-                                    git revert --no-commit $env:GIT_COMMIT
+                                    $targetBranch = if ([string]::IsNullOrWhiteSpace($env:BRANCH_NAME)) { "main" } else { $env:BRANCH_NAME }
+
+                                    Write-Host "[Rollback] Target branch: $targetBranch"
+
+                                    git fetch origin $targetBranch
+                                    git checkout -B $targetBranch origin/$targetBranch
+
+                                    Write-Host "[Rollback] Checked out to $targetBranch"
+
+                                    $parents = git show --no-patch --format=%P $env:GIT_COMMIT
+                                    Write-Host "[Rollback] Parents: $parents"
+
+                                    if ($parents -match ' ') {
+                                        Write-Host "[Rollback] Detected merge commit, using -m 1"
+                                        git revert -m 1 --no-commit $env:GIT_COMMIT
+                                    } else {
+                                        Write-Host "[Rollback] Not a merge commit"
+                                        git revert --no-commit $env:GIT_COMMIT
+                                    }
+
+                                    Write-Host "[Rollback] Revert completed, committing"
 
                                     git commit -m "[auto-rollback] Revert $env:GIT_COMMIT (health_failed)"
+
+                                    Write-Host "[Rollback] Commit created"
 
                                     $bytes = [System.Text.Encoding]::UTF8.GetBytes("x-access-token:$env:GH_BOT_TOKEN")
 
                                     $authHeader = [Convert]::ToBase64String($bytes)
 
-                                    git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $authHeader" push origin "HEAD:$env:BRANCH_NAME"
+                                    Write-Host "[Rollback] Pushing to origin/$targetBranch"
+
+                                    git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $authHeader" push origin "HEAD:$targetBranch"
+
+                                    Write-Host "[Rollback] Push completed"
 
                                 '''
 
