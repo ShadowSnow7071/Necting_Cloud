@@ -255,14 +255,14 @@ pipeline {
                                     git fetch origin ${targetBranch}
                                     git checkout -B ${targetBranch} origin/${targetBranch}
 
-                                    parent_count=$(git show --no-patch --format=%P ${GIT_COMMIT} | wc -w | tr -d ' ')
-                                    if [ "$parent_count" -gt "1" ]; then
-                                      git revert -m 1 --no-commit ${GIT_COMMIT}
+                                    parent_count=\$(git show --no-patch --format=%P \$GIT_COMMIT | wc -w | tr -d ' ')
+                                    if [ "\$parent_count" -gt "1" ]; then
+                                      git revert -m 1 --no-commit \$GIT_COMMIT
                                     else
-                                      git revert --no-commit ${GIT_COMMIT}
+                                      git revert --no-commit \$GIT_COMMIT
                                     fi
 
-                                    git commit -m "[auto-rollback] Revert ${GIT_COMMIT} (health_failed)"
+                                    git commit -m "[auto-rollback] Revert \$GIT_COMMIT (health_failed)"
 
                                     auth_header=\$(printf "x-access-token:${GH_BOT_TOKEN}" | base64 | tr -d '\\n')
 
