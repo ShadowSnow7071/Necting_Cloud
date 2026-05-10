@@ -113,7 +113,7 @@ import requests
 api_base = os.environ['RENDER_API_BASE']
 service_id = os.environ['RENDER_SERVICE_ID']
 api_key = os.environ['RENDER_API_KEY']
-poll_seconds = int(os.environ.get('DEPLOY_POLL_SECONDS', '15'))
+poll_seconds = int(os.environ['DEPLOY_POLL_SECONDS'])
 
 success_states = {'live'}
 failed_states = {'build_failed', 'update_failed', 'failed', 'canceled', 'cancelled'}
