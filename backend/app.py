@@ -2130,7 +2130,7 @@ def favicon():
 @app.route('/health')
 def health():
     """Health check simple para monitoreo/deploy."""
-    return jsonify({'status': 'ok'}), 200
+    return jsonify({'status': 'error'}), 500
 
 if __name__ == '__main__':
     PORT = 5000
