@@ -125,9 +125,9 @@ pipeline {
 
             steps {
 
-                echo '[Wait Render Deploy] Esperando 120 segundos para despliegue Render...'
+                echo '[Wait Render Deploy] Esperando 60 segundos para despliegue Render...'
 
-                sleep time: 120, unit: 'SECONDS'
+                sleep time: 60, unit: 'SECONDS'
 
                 echo '[Wait Render Deploy] Espera terminada.'
             }
