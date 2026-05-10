@@ -62,6 +62,8 @@ export async function switchView(view) {
         console.log('switchView: Cambiando a vista:', view);
         currentView = view;
         
+        localStorage.setItem('lastView', view);
+        
         // Verificar que el app-container esté activo
         const appContainer = document.getElementById('app-container');
         if (!appContainer || !appContainer.classList.contains('active')) {
