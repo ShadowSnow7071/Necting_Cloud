@@ -273,7 +273,7 @@ PY
             steps {
                 script {
                     def lastMessage = isUnix()
-                        ? sh(script: "git --no-pager log -1 --pretty=%B | cat", returnStdout: true).trim()
+                        ? sh(script: "git --no-pager log -1 --pretty=%B", returnStdout: true).trim()
                         : bat(script: '''
 @echo off
 git --no-pager log -1 --pretty=%B
