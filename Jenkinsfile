@@ -115,6 +115,7 @@ service_id = os.environ['RENDER_SERVICE_ID']
 api_key = os.environ['RENDER_API_KEY']
 poll_seconds = int(os.environ['DEPLOY_POLL_SECONDS'])
 timeout_minutes = int(os.environ['DEPLOY_TIMEOUT_MINUTES'])
+# Safeguard extra: evita división por cero y garantiza al menos un intento.
 max_attempts = max(1, (timeout_minutes * 60) // max(1, poll_seconds) + 1)
 
 success_states = {'live'}
@@ -172,6 +173,7 @@ PY
                                             Accept = "application/json"
                                         }
                                         $attempt = 0
+                                        $deployCompleted = $false
                                         while ($attempt -lt $maxAttempts) {
                                             $attempt++
                                             $response = Invoke-RestMethod -Method Get -Uri $url -Headers $headers
@@ -188,6 +190,7 @@ PY
 
                                             if ($status -eq "live") {
                                                 Write-Host "[Wait Render Deploy] Deploy completado en estado exitoso."
+                                                $deployCompleted = $true
                                                 break
                                             }
                                             if (@("build_failed","update_failed","failed","canceled","cancelled") -contains $status) {
@@ -195,7 +198,9 @@ PY
                                             }
                                             Start-Sleep -Seconds $pollSeconds
                                         }
-                                        throw "Deploy no alcanzó estado final tras $maxAttempts intentos de polling"
+                                        if (-not $deployCompleted) {
+                                            throw "Deploy no alcanzó estado final tras $maxAttempts intentos de polling"
+                                        }
                                     '''
                                 }
                             }
