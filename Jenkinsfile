@@ -132,14 +132,14 @@ pipeline {
                                     '''
                                 } else {
                                     powershell """
-                                        $ErrorActionPreference = "Stop"
-                                        $url = "$env:APP_URL/health"
+                                        `$ErrorActionPreference = "Stop"
+                                        `$url = "`$env:APP_URL/health"
                                         try {
-                                            $res = Invoke-WebRequest -Uri $url -Method Get -UseBasicParsing -TimeoutSec 20
-                                            Write-Host "[Health Check] status=$($res.StatusCode) url=$url"
-                                            if ($res.StatusCode -ne 200) { throw "Status inesperado: $($res.StatusCode)" }
+                                            `$res = Invoke-WebRequest -Uri `$url -Method Get -UseBasicParsing -TimeoutSec 20
+                                            Write-Host "[Health Check] status=``$(`$res.StatusCode) url=``$url"
+                                            if (``$res.StatusCode -ne 200) { throw "Status inesperado: ``$(`$res.StatusCode)" }
                                         } catch {
-                                            Write-Host "[Health Check] fallo en intento: $($_.Exception.Message)"
+                                            Write-Host "[Health Check] fallo en intento: ``$(`$_.Exception.Message)"
                                             throw
                                         }
                                     """
@@ -200,14 +200,14 @@ pipeline {
                             """
                         } else {
                             powershell """
-                                $ErrorActionPreference = "Stop"
-                                git config user.name "$env:GH_BOT_NAME"
-                                git config user.email "$env:GH_BOT_EMAIL"
-                                git revert --no-commit $env:GIT_COMMIT
-                                git commit -m "[auto-rollback] Revert $env:GIT_COMMIT (${rollbackReason})"
-                                $bytes = [System.Text.Encoding]::UTF8.GetBytes("x-access-token:$env:GH_BOT_TOKEN")
-                                $authHeader = [Convert]::ToBase64String($bytes)
-                                git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $authHeader" push origin "HEAD:$env:BRANCH_NAME"
+                                `$ErrorActionPreference = "Stop"
+                                git config user.name "`$env:GH_BOT_NAME"
+                                git config user.email "`$env:GH_BOT_EMAIL"
+                                git revert --no-commit `$env:GIT_COMMIT
+                                git commit -m "[auto-rollback] Revert `$env:GIT_COMMIT (${rollbackReason})"
+                                `$bytes = [System.Text.Encoding]::UTF8.GetBytes("x-access-token:`$env:GH_BOT_TOKEN")
+                                `$authHeader = [Convert]::ToBase64String(`$bytes)
+                                git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic `$authHeader" push origin "HEAD:`$env:BRANCH_NAME"
                             """
                         }
                     }
