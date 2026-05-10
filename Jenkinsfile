@@ -11,6 +11,7 @@ pipeline {
         PIP_DISABLE_PIP_VERSION_CHECK = '1'
         PYTHONDONTWRITEBYTECODE = '1'
 
+        // URL falsa intencional para probar rollback
         APP_URL = 'https://necting-cloud-FAKE.onrender.com'
 
         DEPLOY_FAILED = 'false'
@@ -152,6 +153,7 @@ pipeline {
 
             when {
                 allOf {
+
                     expression {
                         env.BRANCH_NAME == 'main' ||
                         env.GIT_BRANCH == 'origin/main'
@@ -231,23 +233,17 @@ pipeline {
 
                                 env.HEALTH_FAILED = 'true'
 
-                                error("Health check failed")
+                                currentBuild.result = 'UNSTABLE'
+
+                                echo 'Deploy guardrail activado: health_failed.'
+
+                                break
                             }
 
                             echo "[Health Check] reintento ${attempt}/${retries}"
 
                             sleep time: env.HEALTH_SLEEP_SECONDS.toInteger(), unit: 'SECONDS'
                         }
-                    }
-                }
-            }
-
-            post {
-                unsuccessful {
-                    script {
-
-                        echo 'Deploy guardrail activado: health_failed.'
-
                     }
                 }
             }
