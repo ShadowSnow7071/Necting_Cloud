@@ -1,4 +1,5 @@
 pipeline {
+    // Pipeline for Necting Cloud CI/CD
     agent { label 'windows' }
 
     options {
