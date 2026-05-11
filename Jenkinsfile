@@ -12,7 +12,11 @@ pipeline {
         PYTHONDONTWRITEBYTECODE = '1'
 
         // URL publica real del backend desplegado en Render
+<<<<<<< HEAD
         APP_URL = 'https://necting-cloud-FAKE-Prueba.onrender.com'
+=======
+        APP_URL = 'https://necting-cloud.onrender.com'
+>>>>>>> 5e27f0bb325724b68fca525c1cf02cd6bc4e8ce8
 
         HEALTH_RETRIES = '5'
         HEALTH_SLEEP_SECONDS = '10'
